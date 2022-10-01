@@ -11,7 +11,7 @@ import (
 )
 
 type Fruit struct {
-	Id int `json: "id"`
+	// Id int `json: "id"`
 	Name string `json: "name"`
 	Price float64 `json: "price"`
 }
@@ -144,7 +144,7 @@ fmt.Println(rows == nil)
 				return
 			}
 
-			idInt -= 1
+			// idInt -= 1
 			dataByte, err := io.ReadAll(r.Body)
 
 			if err != nil {
@@ -157,6 +157,11 @@ fmt.Println(rows == nil)
 
 			if err != nil{
 				sendResponse(http.StatusInternalServerError, "Internal Server Error", nil, w)
+			}
+
+			_, err = db.Exec("UPDATE fruits SET name=$1, price=$2 WHERE id=$3", fruit.Name, fruit.Price, idInt)
+			if err != nil {
+				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
 			}
 
 			sendResponse(http.StatusCreated, "Success Update", nil, w)
@@ -181,7 +186,11 @@ fmt.Println(rows == nil)
 				return
 			}
 
-			idInt -= 1
+			_, err = db.Exec("DELETE from fruits WHERE id=$1", idInt)
+			if err != nil {
+				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
+			}
+
 			sendResponse(http.StatusCreated, "Success Delete", nil, w)
 			return
 			// w.Write([]byte("Ini Delete"))
