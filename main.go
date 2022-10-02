@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"encoding/json"
 	"io"
-	"strconv"
+	// "strconv"
 	"database/sql"
 	_ "github.com/lib/pq"
 )
 
 type Fruit struct {
-	// Id int `json: "id"`
+	Id int `json: "id"`
 	Name string `json: "name"`
 	Price float64 `json: "price"`
 }
@@ -21,8 +21,6 @@ type Response struct {
 	Message string 	 `json: "message"`
 	Data interface{} `json: "data"`
 }
-
-// var fruits []Fruit
 
 func sendResponse(code int, message string, data interface{}, w http.ResponseWriter) {
 	resp := Response {
@@ -65,18 +63,19 @@ func main() {
 
 	http.HandleFunc("/api/v1/fruits", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet{
-			// fmt.
-			rows, err := db.Query("select Name, Price from fruits")
+			rows, err := db.Query("select id, Name, Price from fruits")
 			if err != nil{
 				sendResponse(http.StatusBadRequest, "Internal Server Error", nil, w)
+				return
 			}
 
 			var fruits []Fruit
-fmt.Println(rows == nil)
+			fmt.Println(rows == nil)
 			for rows.Next(){
 				var fruit Fruit
 
 				err=rows.Scan(
+					&fruit.Id,
 					&fruit.Name,
 					&fruit.Price,
 				)
@@ -89,18 +88,6 @@ fmt.Println(rows == nil)
 			}
 			sendResponse(http.StatusOK, "Success", fruits, w)
 			return
-
-			// dataByte, err := json.Marshal(fruits)
-			// if err != nil {
-			// 	w.Header().Set("content-type", "application/json")
-			// 	w.WriteHeader(http.StatusBadRequest)
-			// 	w.Write([]byte("Ada Error" + err.Error()))
-			// 	return	
-			// }
-			// w.Header().Set("content-type", "application/json")
-			// w.WriteHeader(http.StatusOK)
-			// w.Write(dataByte)
-			// return
 		}
 
 		if r.Method == http.MethodPost{
@@ -123,12 +110,12 @@ fmt.Println(rows == nil)
 				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
 			}
 
-			// w.Write([]byte("Ini Post atau Create"))
 			sendResponse(http.StatusCreated, "Success", nil, w)
 			return
 		}
 
 		if r.Method == http.MethodPut{
+			//get query param
 			id := r.URL.Query().Get("id")
 
 			if id == "" {
@@ -136,38 +123,67 @@ fmt.Println(rows == nil)
 				return
 			}
 
-			//cek id ada atau tidak
-			idInt, err := strconv.Atoi(id)
-
+			// idInt, err := strconv.Atoi(id)
+			rows, err := db.Query("select id, name, price from fruits where id = $1", id)
 			if err != nil {
-				sendResponse(http.StatusInternalServerError,"Internal Server Error, Fail Convert String To Int", nil, w)
+				sendResponse(http.StatusInternalServerError,"Internal Server Error, Get Fruits", nil, w)
 				return
 			}
 
-			// idInt -= 1
+			var fruit Fruit
+
+			if rows.Next() {
+				err = rows.Scan(
+					&fruit.Id,
+					&fruit.Name,
+					&fruit.Price,
+				)
+
+				if err != nil {
+					sendResponse(http.StatusInternalServerError,"Internal Server Error, Scan data return err", nil, w)
+					return
+				}
+			}
+
+			if fruit.Id == 0 {
+				if err != nil {
+					sendResponse(http.StatusBadRequest, "bad request", nil, w)
+				}
+			}
+
+			// if err != nil {
+			// 	sendResponse(http.StatusInternalServerError,"Internal Server Error, Fail Convert String To Int", nil, w)
+			// 	return
+			// }
+
 			dataByte, err := io.ReadAll(r.Body)
 
 			if err != nil {
 				sendResponse(http.StatusBadRequest, "bad request", nil, w)
+				return
 			}
 			
 			defer r.Body.Close()
-			var fruit Fruit
-			err = json.Unmarshal(dataByte, &fruit)
+
+			var newFruit Fruit
+			err = json.Unmarshal(dataByte, &newFruit)
 
 			if err != nil{
-				sendResponse(http.StatusInternalServerError, "Internal Server Error", nil, w)
+				sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
+				return
 			}
 
-			_, err = db.Exec("UPDATE fruits SET name=$1, price=$2 WHERE id=$3", fruit.Name, fruit.Price, idInt)
+			fruit.Name = newFruit.Name
+			fruit.Price = newFruit.Price
+
+			_, err = db.Exec("UPDATE fruits SET name=$2, price=$3 WHERE id=$1", fruit.Id, fruit.Name, fruit.Price)
 			if err != nil {
-				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
+				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", err.Error(), w)
+				return
 			}
 
-			sendResponse(http.StatusCreated, "Success Update", nil, w)
+			sendResponse(http.StatusOK, "Success Update", nil, w)
 			return
-
-			// w.Write([]byte("Ini Put"))
 		}
 
 		if r.Method == http.MethodDelete{
@@ -178,17 +194,37 @@ fmt.Println(rows == nil)
 				return
 			}
 
-			//cek id ada atau tidak
-			idInt, err := strconv.Atoi(id)
-
+			rows, err := db.Query("select id, name, price from fruits where id = $1", id)
 			if err != nil {
-				sendResponse(http.StatusInternalServerError,"Internal Server Error, Fail Convert String To Int", nil, w)
+				sendResponse(http.StatusInternalServerError,"Internal Server Error, Get Fruits", nil, w)
 				return
 			}
 
-			_, err = db.Exec("DELETE from fruits WHERE id=$1", idInt)
+			var fruit Fruit
+
+			if rows.Next() {
+				err = rows.Scan(
+					&fruit.Id,
+					&fruit.Name,
+					&fruit.Price,
+				)
+
+				if err != nil {
+					sendResponse(http.StatusInternalServerError,"Internal Server Error, Scan data return err", nil, w)
+					return
+				}
+			}
+
+			if fruit.Id == 0 {
+				if err != nil {
+					sendResponse(http.StatusBadRequest, "bad request", nil, w)
+				}
+			}
+
+			_, err = db.Exec("DELETE from fruits WHERE id=$1", fruit.Id)
 			if err != nil {
-				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
+				sendResponse(http.StatusInternalServerError, "internal server error, delete fruit return err", nil, w)
+				return
 			}
 
 			sendResponse(http.StatusCreated, "Success Delete", nil, w)
