@@ -1,39 +1,30 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"encoding/json"
-	"io"
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	models "github.com/nurulalyh/Buah/models"
+	"github.com/nurulalyh/Buah/repository"
 )
 
-type Fruit struct {
-	Id int `json: "id"`
-	Name string `json: "name"`
-	Price float64 `json: "price"`
-}
-
-type Response struct {
-	Code int 		 `json: "code"`
-	Message string 	 `json: "message"`
-	Data interface{} `json: "data"`
-}
-
 func sendResponse(code int, message string, data interface{}, w http.ResponseWriter) {
-	resp := Response {
-		Code: 	 code,
-		Data: 	 data,
+	resp := models.Response{
+		Code:    code,
+		Data:    data,
 		Message: message,
 	}
 	dataByte, err := json.Marshal(resp)
 
 	if err != nil {
-		resp := Response{
-			Code: 	 http.StatusInternalServerError,
-			Data: 	 nil,
+		resp := models.Response{
+			Code:    http.StatusInternalServerError,
+			Data:    nil,
 			Message: "Internal Server Error",
 		}
 		dataByte, _ = json.Marshal(resp)
@@ -43,15 +34,11 @@ func sendResponse(code int, message string, data interface{}, w http.ResponseWri
 	w.Write(dataByte)
 }
 
-func Remove(slice []Fruit, s int) []Fruit {
-	return append(slice[:1], slice[s+1:]...)
-}
-
 var db *sql.DB
 
-func GetFruit (w http.ResponseWriter, r *http.Request) {
-	
-}
+// func GetFruit(w http.ResponseWriter, r *http.Request) {
+
+// }
 
 func main() {
 	db, err := sql.Open("postgres", "postgres://postgres:rootroot@localhost/fruits?sslmode=disable")
@@ -66,34 +53,19 @@ func main() {
 
 	r := mux.NewRouter()
 
-	r.HandleFunc("/api/v1/fruits", func (w http.ResponseWriter, r *http.Request)  {
-		fmt.Println(1111,db == nil)
-		rows, err := db.Query("select id, Name, Price from fruits")
-			if err != nil{
-				sendResponse(http.StatusBadRequest, "Internal Server Error", nil, w)
-				return
-			}
-
-			var fruits []Fruit
-			fmt.Println(rows == nil)
-			for rows.Next(){
-				var fruit Fruit
-
-				err=rows.Scan(
-					&fruit.Id,
-					&fruit.Name,
-					&fruit.Price,
-				)
-
-				if err != nil {
-					sendResponse(http.StatusInternalServerError, "Internal Server", nil, w)
-				}
-				fruits = append(fruits, fruit)
-			}
-			sendResponse(http.StatusOK, "Success", fruits, w)
+	//Method Get
+	r.HandleFunc("/api/v1/fruits", func(w http.ResponseWriter, r *http.Request) {
+		fruits, err := repository.GetFruits(db)
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "Internal Server Error, Get Fruits", err.Error(), w)
 			return
+		}
+
+		sendResponse(http.StatusOK, "Success", fruits, w)
 	}).Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/fruits/{id}", func (w http.ResponseWriter, r *http.Request) {
+
+	//Method Put
+	r.HandleFunc("/api/v1/fruits/{id}", func(w http.ResponseWriter, r *http.Request) {
 		//get query param
 		id := mux.Vars(r)["id"]
 
@@ -103,24 +75,16 @@ func main() {
 		}
 
 		// idInt, err := strconv.Atoi(id)
-		rows, err := db.Query("select id, name, price from fruits where id = $1", id)
+		// rows, err := db.Query("select id, name, price from fruits where id = $1", id)
 		if err != nil {
-			sendResponse(http.StatusInternalServerError,"Internal Server Error, Get Fruits", nil, w)
+			sendResponse(http.StatusInternalServerError, "Internal Server Error, Get Fruits", nil, w)
 			return
 		}
 
-		var fruit Fruit
-		if rows.Next() {
-			err = rows.Scan(
-				&fruit.Id,
-				&fruit.Name,
-				&fruit.Price,
-			)
-
-			if err != nil {
-				sendResponse(http.StatusInternalServerError,"Internal Server Error, Scan data return err", nil, w)
-				return
-			}
+		fruit, err := repository.GetFruit(db, id)
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "Internal Server Error, Get Fruits return error", err.Error(), w)
+			return
 		}
 
 		if fruit.Id == 0 {
@@ -136,9 +100,9 @@ func main() {
 		}
 		defer r.Body.Close()
 
-		var newFruit Fruit
+		var newFruit models.Fruit
 		err = json.Unmarshal(dataByte, &newFruit)
-		if err != nil{
+		if err != nil {
 			sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
 			return
 		}
@@ -146,101 +110,90 @@ func main() {
 		fruit.Name = newFruit.Name
 		fruit.Price = newFruit.Price
 
-		_, err = db.Exec("UPDATE fruits SET name=$2, price=$3 WHERE id=$1", fruit.Id, fruit.Name, fruit.Price)
+		err = repository.UpdateFruits(db, fruit)
 		if err != nil {
-			sendResponse(http.StatusInternalServerError, "internal server error, get fruits", err.Error(), w)
+			sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
 			return
 		}
+
 		sendResponse(http.StatusOK, "Success Update", nil, w)
-		return
 	}).Methods(http.MethodPut)
 
-	r.HandleFunc("/api/v1/fruits", func (w http.ResponseWriter, r *http.Request) {
+	//Method Post
+	r.HandleFunc("/api/v1/fruits", func(w http.ResponseWriter, r *http.Request) {
 		dataByte, err := io.ReadAll(r.Body)
-			if err != nil {
-				sendResponse(http.StatusBadRequest, "Bad Request", nil, w)
-			}
-			defer r.Body.Close()
+		if err != nil {
+			sendResponse(http.StatusBadRequest, "Bad Request", nil, w)
+		}
+		defer r.Body.Close()
 
-			var fruit Fruit
-			err = json.Unmarshal(dataByte, &fruit)
+		var fruit models.Fruit
+		err = json.Unmarshal(dataByte, &fruit)
 
-			if err != nil {
-				sendResponse(http.StatusInternalServerError, "Internal Server Error", nil, w)
-			}
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "Internal Server Error", nil, w)
+		}
 
-			_, err = db.Exec("insert into fruits(Name,Price) values($1,$2)", fruit.Name, fruit.Price)
-			if err != nil {
-				sendResponse(http.StatusInternalServerError, "internal server error, get fruits", nil, w)
-			}
-			sendResponse(http.StatusCreated, "Success", nil, w)
-			return
+		err = repository.CreateFruits(db, fruit)
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
+		}
+
+		sendResponse(http.StatusCreated, "Success", nil, w)
+		return
 	}).Methods(http.MethodPost)
 
-	r.HandleFunc("/api/v1/fruits/{id}", func (w http.ResponseWriter, r *http.Request) {
+	//Method Delete
+	r.HandleFunc("/api/v1/fruits/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := mux.Vars(r)["id"]
 
-			if id == "" {
-				sendResponse(http.StatusBadRequest, "Bad Request, Data Id Params Is Null", nil, w)
-				return
-			}
-
-			rows, err := db.Query("select id, name, price from fruits where id = $1", id)
-			if err != nil {
-				sendResponse(http.StatusInternalServerError,"Internal Server Error, Get Fruits", nil, w)
-				return
-			}
-
-			var fruit Fruit
-			if rows.Next() {
-				err = rows.Scan(
-					&fruit.Id,
-					&fruit.Name,
-					&fruit.Price,
-				)
-
-				if err != nil {
-					sendResponse(http.StatusInternalServerError,"Internal Server Error, Scan data return err", nil, w)
-					return
-				}
-			}
-
-			if fruit.Id == 0 {
-				if err != nil {
-					sendResponse(http.StatusBadRequest, "bad request", nil, w)
-				}
-			}
-
-			_, err = db.Exec("DELETE from fruits WHERE id=$1", fruit.Id)
-			if err != nil {
-				sendResponse(http.StatusInternalServerError, "internal server error, delete fruit return err", nil, w)
-				return
-			}
-
-			sendResponse(http.StatusCreated, "Success Delete", nil, w)
+		if id == "" {
+			sendResponse(http.StatusBadRequest, "Bad Request, Data Id Params Is Null", nil, w)
 			return
+		}
+
+		fruit, err := repository.GetFruit(db, id)
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "internal server error, delete fruit return err", err.Error(), w)
+			return
+		}
+
+		if fruit.Id == 0 {
+			if err != nil {
+				sendResponse(http.StatusBadRequest, "bad request", nil, w)
+			}
+		}
+
+		err = repository.Delete(db, id)
+		if err != nil {
+			sendResponse(http.StatusInternalServerError, "internal server error, delete fruit return err", err.Error(), w)
+			return
+		}
+
+		sendResponse(http.StatusCreated, "Success Delete", nil, w)
+		return
 	}).Methods(http.MethodDelete)
 
 	http.HandleFunc("/api/v1/fruits", func(w http.ResponseWriter, r *http.Request) {
 
 		//Get Method
 		// if r.Method == http.MethodGet{
-			
+
 		// }
 
 		//Post Method
 		// if r.Method == http.MethodPost{
-			
+
 		// }
 
 		//Put Method
 		// if r.Method == http.MethodPut{
-			
+
 		// }
 
 		//Delete Method
 		// if r.Method == http.MethodDelete{
-			
+
 		// }
 	})
 
