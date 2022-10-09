@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/nurulalyh/Buah/models"
 )
@@ -20,17 +21,17 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) CreateFruits(fruit models.Fruit) (err error) {
 	_, err = r.db.Exec("insert into fruits(Name,Price) values($1,$2)", fruit.Name, fruit.Price)
 	if err != nil {
-		return err
+		return errors.New("create fruit return error : " + err.Error())
 	}
 
 	return nil
 }
 
-//List
+// List
 func (r *Repository) GetFruits() (fruits []models.Fruit, err error) {
 	rows, err := r.db.Query("select Id, Name, Price from fruits")
 	if err != nil {
-		return nil, err
+		return nil, errors.New("get fruit return error : " + err.Error())
 	}
 
 	for rows.Next() {
@@ -43,7 +44,7 @@ func (r *Repository) GetFruits() (fruits []models.Fruit, err error) {
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, errors.New("get fruit return error, scan data return error  : " + err.Error())
 		}
 		fruits = append(fruits, fruit)
 	}
@@ -54,7 +55,7 @@ func (r *Repository) GetFruits() (fruits []models.Fruit, err error) {
 func (r *Repository) GetFruit(id int) (fruit models.Fruit, err error) {
 	rows, err := r.db.Query("select id, Name, Price from fruits where id = $1", id)
 	if err != nil {
-		return models.Fruit{}, err
+		return models.Fruit{}, errors.New("get fruit return error : " + err.Error())
 	}
 
 	if rows.Next() {
@@ -65,14 +66,14 @@ func (r *Repository) GetFruit(id int) (fruit models.Fruit, err error) {
 		)
 
 		if err != nil {
-			return models.Fruit{}, err
+			return models.Fruit{}, errors.New("get fruit return error, scan data return error  : " + err.Error())
 		}
-		
+
 	}
 	return fruit, nil
 }
 
-//Delete
+// Delete
 func (r *Repository) Delete(id int) (err error) {
 	_, err = r.db.Exec("delete from fruits WHERE id=$1", id)
 	if err != nil {

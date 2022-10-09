@@ -1,8 +1,6 @@
 package service
 
 import (
-	"errors"
-
 	"github.com/nurulalyh/Buah/models"
 	"github.com/nurulalyh/Buah/repository"
 )
@@ -19,9 +17,8 @@ func NewService(repo *repository.Repository) *Service {
 
 // Create
 func (svc *Service) Create(fruit models.Fruit) error {
-	err := svc.repository.CreateFruits(fruit)
-	if err != nil {
-		return err
+	if err := svc.repository.CreateFruits(fruit); err != nil {
+		return models.NewInternalServerError(err.Error())
 	}
 	return nil
 }
@@ -30,18 +27,18 @@ func (svc *Service) Create(fruit models.Fruit) error {
 func (svc *Service) Update(newFruit models.Fruit) error {
 	fruit, err := svc.repository.GetFruit(newFruit.Id)
 	if err != nil {
-		return err
+		return models.NewInternalServerError(err.Error())
 	}
 
-	if fruit.Id == 0 {
-		return errors.New("data Fruits Not Found")
+	err = fruit.Exist()
+	if err != nil {
+		return err
 	}
 
 	fruit.Name = newFruit.Name
 	fruit.Price = newFruit.Price
 
-	err = svc.repository.UpdateFruits(fruit)
-	if err != nil {
+	if err = svc.repository.UpdateFruits(fruit); err != nil {
 		return err
 	}
 	return nil
@@ -53,6 +50,7 @@ func (svc *Service) List() ([]models.Fruit, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return fruits, nil
 }
 
@@ -60,8 +58,13 @@ func (svc *Service) List() ([]models.Fruit, error) {
 func (svc *Service) Get(id int) (models.Fruit, error) {
 	fruit, err := svc.repository.GetFruit(id)
 	if err != nil {
+		return models.Fruit{}, models.NewInternalServerError(err.Error())
+	}
+
+	if err = fruit.Exist(); err != nil {
 		return models.Fruit{}, err
 	}
+
 	return fruit, nil
 }
 
@@ -69,16 +72,16 @@ func (svc *Service) Get(id int) (models.Fruit, error) {
 func (svc *Service) Delete(id int) error {
 	fruit, err := svc.repository.GetFruit(id)
 	if err != nil {
+		return models.NewInternalServerError(err.Error())
+	}
+
+	if err = fruit.Exist(); err != nil {
 		return err
 	}
 
-	if fruit.Id == 0 {
-		return errors.New("data Fruits Not Found")
+	if err = svc.repository.Delete(fruit.Id); err != nil {
+		return models.NewInternalServerError(err.Error())
 	}
 
-	err = svc.repository.Delete(fruit.Id)
-	if err != nil {
-		return err
-	}
 	return nil
 }

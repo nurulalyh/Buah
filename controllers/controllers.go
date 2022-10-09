@@ -21,16 +21,21 @@ func sendResponse(code int, message string, data interface{}, w http.ResponseWri
 		Data:    data,
 		Message: message,
 	}
-	dataByte, err := json.Marshal(resp)
+	write(resp, code, w)
+}
 
-	if err != nil {
-		resp := models.Response{
-			Code:    http.StatusInternalServerError,
-			Data:    nil,
-			Message: "Internal Server Error",
-		}
-		dataByte, _ = json.Marshal(resp)
+func sendResponseError(err error, w http.ResponseWriter) {
+	if v, ok := err.(*models.Errors); ok {
+		write(v, v.Code, w)
+		return
 	}
+
+	data := models.NewErrors(http.StatusInternalServerError, "internal server error", err.Error())
+	write(data, http.StatusInternalServerError, w)
+}
+
+func write(data interface{}, code int, w http.ResponseWriter) {
+	dataByte, _ := json.Marshal(data)
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(code)
 	w.Write(dataByte)
@@ -46,7 +51,8 @@ func NewController(service *service.Service) *Controller {
 func (ctrl *Controller) Create(w http.ResponseWriter, r *http.Request) {
 	dataByte, err := io.ReadAll(r.Body)
 	if err != nil {
-		sendResponse(http.StatusBadRequest, "Bad Request", nil, w)
+		sendResponseError(models.NewInternalServerError(err.Error()), w)
+		return
 	}
 	defer r.Body.Close()
 
@@ -54,15 +60,22 @@ func (ctrl *Controller) Create(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(dataByte, &fruit)
 
 	if err != nil {
-		sendResponse(http.StatusInternalServerError, "Internal Server Error", nil, w)
+		sendResponseError(models.NewInternalServerError(err.Error()), w)
+		return
+	}
+
+	if err = fruit.Validate(); err != nil {
+		sendResponseError(err, w)
+		return
 	}
 
 	err = ctrl.service.Create(fruit)
 	if err != nil {
-		sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
+		sendResponseError(err, w)
+		return
 	}
 
-	sendResponse(http.StatusCreated, "Success", nil, w)
+	sendResponse(http.StatusCreated, "Success created data", nil, w)
 }
 
 // Update
@@ -71,20 +84,20 @@ func (ctrl *Controller) Update(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
 	if id == "" {
-		sendResponse(http.StatusBadRequest, "Bad Request, Data Id Params Is Null", nil, w)
+		sendResponseError(models.NewBadRequest("error parameter id"), w)
 		return
 	}
 
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
-		sendResponse(http.StatusBadRequest, "cannot convert id param from string to int", nil, w)
+		sendResponseError(models.NewBadRequest("cannot convert id param from string to int"), w)
 		return
 	}
 
 	dataByte, err := io.ReadAll(r.Body)
 
 	if err != nil {
-		sendResponse(http.StatusBadRequest, "bad request", nil, w)
+		sendResponseError(err, w)
 		return
 	}
 	defer r.Body.Close()
@@ -92,7 +105,7 @@ func (ctrl *Controller) Update(w http.ResponseWriter, r *http.Request) {
 	var fruit models.Fruit
 	err = json.Unmarshal(dataByte, &fruit)
 	if err != nil {
-		sendResponse(http.StatusInternalServerError, "Internal Server Error", err.Error(), w)
+		sendResponseError(err, w)
 		return
 	}
 
