@@ -17,7 +17,7 @@ func NewService(repo *repository.Repository) *Service {
 	}
 }
 
-// create
+// Create
 func (svc *Service) Create(fruit models.Fruit) error {
 	err := svc.repository.CreateFruits(fruit)
 	if err != nil {
@@ -26,7 +26,7 @@ func (svc *Service) Create(fruit models.Fruit) error {
 	return nil
 }
 
-// update
+// Update
 func (svc *Service) Update(newFruit models.Fruit) error {
 	fruit, err := svc.repository.GetFruit(newFruit.Id)
 	if err != nil {
@@ -47,7 +47,7 @@ func (svc *Service) Update(newFruit models.Fruit) error {
 	return nil
 }
 
-// get all
+// List
 func (svc *Service) List() ([]models.Fruit, error) {
 	fruits, err := svc.repository.GetFruits()
 	if err != nil {
@@ -56,7 +56,7 @@ func (svc *Service) List() ([]models.Fruit, error) {
 	return fruits, nil
 }
 
-// get satu
+// Get
 func (svc *Service) Get(id int) (models.Fruit, error) {
 	fruit, err := svc.repository.GetFruit(id)
 	if err != nil {
@@ -65,7 +65,7 @@ func (svc *Service) Get(id int) (models.Fruit, error) {
 	return fruit, nil
 }
 
-// delete
+// Delete
 func (svc *Service) Delete(id int) error {
 	fruit, err := svc.repository.GetFruit(id)
 	if err != nil {

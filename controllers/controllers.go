@@ -42,6 +42,7 @@ func NewController(service *service.Service) *Controller {
 	}
 }
 
+// Create
 func (ctrl *Controller) Create(w http.ResponseWriter, r *http.Request) {
 	dataByte, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -64,6 +65,7 @@ func (ctrl *Controller) Create(w http.ResponseWriter, r *http.Request) {
 	sendResponse(http.StatusCreated, "Success", nil, w)
 }
 
+// Update
 func (ctrl *Controller) Update(w http.ResponseWriter, r *http.Request) {
 	//get query param
 	id := mux.Vars(r)["id"]
@@ -105,6 +107,7 @@ func (ctrl *Controller) Update(w http.ResponseWriter, r *http.Request) {
 	sendResponse(http.StatusOK, "Success Update", nil, w)
 }
 
+// Delete
 func (ctrl *Controller) Delete(w http.ResponseWriter, r *http.Request) {
 	//get query param
 	id := mux.Vars(r)["id"]
@@ -129,6 +132,7 @@ func (ctrl *Controller) Delete(w http.ResponseWriter, r *http.Request) {
 	sendResponse(http.StatusOK, "Success Update", nil, w)
 }
 
+// List
 func (ctrl *Controller) List(w http.ResponseWriter, r *http.Request) {
 	fruits, err := ctrl.service.List()
 	if err != nil {
@@ -138,6 +142,7 @@ func (ctrl *Controller) List(w http.ResponseWriter, r *http.Request) {
 	sendResponse(http.StatusOK, "Success", fruits, w)
 }
 
+// Get
 func (ctrl *Controller) Get(w http.ResponseWriter, r *http.Request) {
 	//get query param
 	id := mux.Vars(r)["id"]

@@ -6,10 +6,19 @@ import (
 	"github.com/nurulalyh/Buah/models"
 )
 
-//Create
+type Repository struct {
+	db *sql.DB
+}
 
-func CreateFruits(db *sql.DB, fruit models.Fruit) (err error) {
-	_, err = db.Exec("insert into fruits(Name,Price) values($1,$2)", fruit.Name, fruit.Price)
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{
+		db: db,
+	}
+}
+
+// Create
+func (r *Repository) CreateFruits(fruit models.Fruit) (err error) {
+	_, err = r.db.Exec("insert into fruits(Name,Price) values($1,$2)", fruit.Name, fruit.Price)
 	if err != nil {
 		return err
 	}
@@ -17,16 +26,13 @@ func CreateFruits(db *sql.DB, fruit models.Fruit) (err error) {
 	return nil
 }
 
-//Get
-
-func GetFruits(db *sql.DB) (fruits []models.Fruit, err error) {
-	rows, err := db.Query("select id, Name, Price from fruits")
+//List
+func (r *Repository) GetFruits() (fruits []models.Fruit, err error) {
+	rows, err := r.db.Query("select Id, Name, Price from fruits")
 	if err != nil {
 		return nil, err
 	}
 
-	// var fruits []models.Fruit
-	// fmt.Println(rows == nil)
 	for rows.Next() {
 		var fruit models.Fruit
 
@@ -44,18 +50,14 @@ func GetFruits(db *sql.DB) (fruits []models.Fruit, err error) {
 	return fruits, nil
 }
 
-// Delete
-func GetFruit(db *sql.DB, id string) (fruit models.Fruit, err error) {
-	rows, err := db.Query("select id, Name, Price from fruits where id = $1", id)
+// Get
+func (r *Repository) GetFruit(id int) (fruit models.Fruit, err error) {
+	rows, err := r.db.Query("select id, Name, Price from fruits where id = $1", id)
 	if err != nil {
 		return models.Fruit{}, err
 	}
 
-	// var fruits []models.Fruit
-	// fmt.Println(rows == nil)
 	if rows.Next() {
-		// var fruit models.Fruit
-
 		err = rows.Scan(
 			&fruit.Id,
 			&fruit.Name,
@@ -65,22 +67,23 @@ func GetFruit(db *sql.DB, id string) (fruit models.Fruit, err error) {
 		if err != nil {
 			return models.Fruit{}, err
 		}
-		// fruits = append(fruits, fruit)
+		
 	}
 	return fruit, nil
 }
 
-func Delete(db *sql.DB, id string) (err error) {
-	_, err = db.Exec("DELETE from fruits WHERE id=$1", id)
+//Delete
+func (r *Repository) Delete(id int) (err error) {
+	_, err = r.db.Exec("delete from fruits WHERE id=$1", id)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// update
-func UpdateFruits(db *sql.DB, fruit models.Fruit) (err error) {
-	_, err = db.Exec("update fruits set name = $2, price = $3 where id = $1", fruit.Id, fruit.Name, fruit.Price)
+// Update
+func (r *Repository) UpdateFruits(fruit models.Fruit) (err error) {
+	_, err = r.db.Exec("update fruits set name = $2, price = $3 where id = $1", fruit.Id, fruit.Name, fruit.Price)
 	if err != nil {
 		return err
 	}
